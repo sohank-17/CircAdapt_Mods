@@ -1,0 +1,4 @@
+rows_attempted=5
+rows_succeeded=5
+mae_bpm=7.6085
+rmse_bpm=13.0061

@@ -1,0 +1,9 @@
+rows_requested=all
+rows_attempted=142
+rows_succeeded=142
+rest_only=True
+mae_bpm=15.8681
+rmse_bpm=19.5588
+critical_features_used=sex,age,height,weight,BMI,BSA,study,Group,Condition_description,watts,rpe
+dataset=custom\SAS Database_multiple populations_for Amee Sangani.xlsx
+output_csv=custom\outputs\circadapt_hr_comparison_rest.csv

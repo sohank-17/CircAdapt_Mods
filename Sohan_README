@@ -1,0 +1,133 @@
+﻿# Sohan_README
+
+## Objective
+
+This note explains how the 4 repositories connect to the core CircAdapt model and how to position them as a foundation for a DL/Reinforcement Learning program using the SAS dataset.
+
+## What "Core CircAdapt" Means Here
+
+Core CircAdapt is the cardiovascular simulator engine (heart + circulation + wall mechanics + valves + control logic) represented by the `P` structure (MATLAB flows) or model API (Python `circadapt` package).  
+All four repos are scenario-specific wrappers/extensions around this core engine.
+
+---
+
+## Repo-to-Core Interaction Map
+
+### 1) Arts2024ContractionModel
+
+How it interacts with core CircAdapt:
+- Uses full MATLAB CircAdapt implementation in `CircAdaptXC07/`.
+- Directly modifies/extends **sarcomere contraction mechanics** via:
+  - `SarcSf.m` (stress-stiffness relation)
+  - `SarcDot.m` (state derivatives, Ca-crossbridge coupling)
+- Runs through standard core execution path (`CircAdaptMain -> CircAdapt`).
+
+Why this matters for ML:
+- Best source for learning/tuning **micro-to-macro mechanistic mapping**:
+  cellular contractility parameters -> whole-heart outputs.
+
+---
+
+### 2) Koopsen2024ParameterSubsetReduction
+
+How it interacts with core CircAdapt:
+- Uses MATLAB orchestration + CircAdapt C++/MEX backend (`CircAdapt-master/matlab/src`).
+- Loads reference core states (`PRef*.mat`) and repeatedly runs core solver (`RunCPP`).
+- Adds analysis/optimization layers on top of core runs:
+  - Morris screening
+  - Sobol simulations
+  - Diaphony scoring
+  - DMS-PSO personalization
+
+Why this matters for ML:
+- Provides a ready template for **parameter importance reduction** and **search-space pruning**, critical before DL/RL training.
+
+---
+
+### 3) Munneke2023
+
+How it interacts with core CircAdapt:
+- Uses MATLAB CircAdapt core and extends it with **coronary autoregulation + perfusion logic**.
+- Core scenario states are stored in `PRef*.mat` (baseline, acute/chronic LBBB, hyperemia).
+- `CircAdaptMain.m` and `plotFigures.m` run/analyze different physiological scenarios.
+
+Why this matters for ML:
+- Strong source for physiologic labels/outcomes tied to dyssynchrony and remodeling.
+- Useful to define target outputs for supervised learning (flow reserve, perfusion gradients, stress/strain behavior).
+
+---
+
+### 4) VanOsta2024NumericalCredibilityAssessment
+
+How it interacts with core CircAdapt:
+- Uses Python `circadapt` API (`circadapt.VanOsta2024()`) as the core simulator interface.
+- Runs large Monte Carlo sweeps across solver/time-step/threshold protocols.
+- Captures stability/crash/signal error/runtime metrics.
+
+Why this matters for ML:
+- Provides numerical reliability characterization for simulation-generated training data.
+- Critical for deciding which simulator configurations are trustworthy for dataset generation and RL environment rollouts.
+
+---
+
+## How the SAS Dataset Fits
+
+File:
+- `Custom/SAS Database_multiple populations_for Amee Sangani.xlsx`
+
+Role in the program:
+- Real-world patient/cohort feature table (demographics, hemodynamics, exercise, PV-like metrics).
+- Acts as the **clinical anchor** for parameter inference and validation.
+- CircAdapt can be used as a physiologic simulator to map latent parameters to observables in SAS columns.
+
+---
+
+## Recommended DL/RL Development Strategy
+
+### Phase 1: Data and variable harmonization
+- Build one unified feature dictionary:
+  - SAS columns (observed clinical variables)
+  - CircAdapt outputs (simulated observables)
+  - CircAdapt parameters (latent physiology)
+- Resolve duplicate SAS headers (`HR`, `SV`, `PVA`, etc.) and missingness policy.
+
+### Phase 2: Parameter-space reduction (must-do before heavy ML)
+- Reuse Koopsen workflow (Morris/Sobol) to select a compact high-impact parameter subset.
+- Restrict simulator-driven training to this subset to reduce identifiability issues.
+
+### Phase 3: Supervised surrogate modeling (DL)
+- Generate synthetic paired data: parameter subset -> CircAdapt outputs.
+- Train fast surrogate model to emulate CircAdapt outputs for selected endpoints.
+- Use Munneke scenario states and Arts contraction variants to improve physiologic diversity.
+
+### Phase 4: Inverse modeling / personalization
+- Train inference model: observed SAS-like features -> probable CircAdapt parameter vectors.
+- Validate by forward simulation and error-to-observed metrics.
+
+### Phase 5: Reinforcement learning layer
+- Define RL environment:
+  - State: current mismatch between simulated outputs and target patient profile
+  - Action: bounded parameter adjustments
+  - Reward: negative weighted objective error + penalties for instability/non-physiologic states
+- Use VanOsta stability constraints to mask unsafe/unstable action zones.
+
+---
+
+## Meeting-Ready Talking Points (Short)
+
+1. The 4 repos are not separate products; they are complementary interfaces around the same CircAdapt simulator core.
+2. Arts gives contraction-mechanics depth, Koopsen gives parameter reduction/optimization workflows, Munneke gives physiologic perfusion scenarios, VanOsta gives numerical reliability checks.
+3. SAS data provides real-world clinical observables; CircAdapt provides mechanistic latent-state simulation.
+4. The core technical plan is: harmonize variables -> reduce parameter space -> train surrogate/inverse models -> deploy RL for closed-loop personalization.
+5. Main risk is identifiability and simulation instability; mitigation is Koopsen-style sensitivity filtering plus VanOsta stability constraints.
+
+---
+
+## Suggested First Deliverables
+
+- `v1_data_dictionary.csv`: SAS-to-CircAdapt variable mapping.
+- `v1_parameter_subset.yaml`: reduced parameter set from sensitivity analysis.
+- `v1_surrogate_model.ipynb`: baseline DL forward model.
+- `v1_rl_env_spec.md`: RL state/action/reward definitions with safety constraints.
+
+This framing should be appropriate for explaining both the scientific rationale and an executable engineering path in your meeting.
